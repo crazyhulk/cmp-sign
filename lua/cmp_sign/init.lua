@@ -123,18 +123,17 @@ source.complete = function(self, params, callback)
 		isRetrigger = not not self.signature_help,
 		activeSignatureHelp = self.signature_help,
 	}
-	-- client.request('textDocument/signatureHelp', request, function(_, signature_help)
+	-- local xparams = vim.lsp.util.make_position_params()
+	-- vim.lsp.buf_request(0, 'textDocument/signatureHelp', xparams, function(err, xsignature_help)
+	-- 	print("========2",err, vim.inspect(xsignature_help))
+	-- end)
+
 	client.request('textDocument/hover', request, function(err, signature_help, ctx)
 		if err or not signature_help then
 			callback({})
 			return
 		end
 
-		-- local lines = {}
-		-- for s in signature_help.contents.value:gmatch("[^\r\n]+") do
-		-- 	table.insert(lines, s)
-		-- end
-		-- local raw_func_sign = lines[2]
 		local raw_func_sign = signature_help.contents.value:match("```go\n(func.-)\n```")
 
 		if not signature_help.range or not raw_func_sign then
@@ -142,8 +141,20 @@ source.complete = function(self, params, callback)
 			return
 		end
 
-		local func_name = raw_func_sign:match("func%s+([%w_%.]+)")
-		local func_sign = raw_func_sign:gsub("func%s+[%w_%.]+", "func ")
+		print("=========raw", print(vim.inspect(signature_help)))
+		local pattern = "func%s*([%w%s(%.)]*)%s+([%w%.]+)(%b())%s+(.*)"
+		local member_object, func_name, param_list, returns = raw_func_sign:match(pattern)
+		print("=========member_object", member_object, func_name, param_list, returns)
+
+		local isReceiver = not member_object or member_object ~= ""
+
+		local func_sign
+		if isReceiver then
+			func_sign = "func " .. member_object:gsub("%)", "") .. "," .. param_list:gsub("%(", "") .. returns
+			-- func_name = signature_help.contents.value:match("%[%`([%w()%.]*)%`")
+		else
+			func_sign = "func " .. param_list .. returns
+		end
 
 
 		local start_pos = {
