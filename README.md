@@ -9,7 +9,7 @@ output:
 `func (x any, less func(i int, j int) bool)`
 
 
-support [mockey](https://github.com/bytedance/mockey)
+Support [mockey](https://github.com/bytedance/mockey), which is useful when making a test for ur code. 
 
 ![mockey](./mockey.jpg)
 
