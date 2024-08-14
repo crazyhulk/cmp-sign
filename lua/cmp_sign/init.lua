@@ -142,7 +142,7 @@ source.complete = function(self, params, callback)
 		end
 
 		print("=========raw", print(vim.inspect(signature_help)))
-		local pattern = "func%s*([%w%s(%.)]*)%s+([%w%.]+)(%b())%s+(.*)"
+		local pattern = "func%s*([%w%s(%.)]*)%s+([%w%.]+)(%b())%s*(.*)"
 		local member_object, func_name, param_list, returns = raw_func_sign:match(pattern)
 		print("=========member_object", member_object, func_name, param_list, returns)
 
@@ -150,7 +150,7 @@ source.complete = function(self, params, callback)
 
 		local func_sign
 		if isReceiver then
-			func_sign = "func " .. member_object:gsub("%)", "") .. "," .. param_list:gsub("%(", "") .. returns
+			func_sign = "func " .. member_object:gsub("%)", "") .. "," .. param_list:gsub("%(", "") .. " " .. returns
 			-- func_name = signature_help.contents.value:match("%[%`([%w()%.]*)%`")
 		else
 			func_sign = "func " .. param_list .. returns
