@@ -6,10 +6,18 @@ local cmp = require('cmp')
 -- Define a custom source
 local source = {}
 
+-- key: completion item menu
+-- value: string, {{sign}} would be replaced with the signature
+local custom_completion_items = {}
+
 source.new = function()
 	local self = setmetatable({}, { __index = source })
 	self.buffers = {}
 	return self
+end
+
+source.setup = function (completion_items)
+	custom_completion_items = completion_items
 end
 
 -- Method to determine if the source is available in the current context
@@ -231,12 +239,40 @@ source.complete = function(self, params, callback)
 			},
 		}
 
+		local items = {
+			item,
+			mockey
+		}
+		for i,v in pairs(custom_completion_items) do
+			local text = v:gsub("{{name}}", func_name)
+			text = text:gsub("{{sign}}", func_sign)
+			local xitem = {
+				label = i,
+				insertText = text,
+				insertTextFormat = 2,  -- Snippet format
+				additionalTextEdits = {
+					{
+						range = {
+							start = start_pos,
+							["end"] = end_pos,
+						},
+						newText = "",
+					}
+				},
+
+				kind = cmp.lsp.CompletionItemKind.Snippet,
+				documentation = {
+					kind = cmp.lsp.MarkupKind.Markdown,
+					value = text
+				},
+			}
+			table.insert(items, xitem)
+		end
+
+
 		callback({
 			isIncomplete = false,
-			items = {
-				item,
-				mockey
-			}
+			items = items
 		})
 	end)
 end
