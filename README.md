@@ -1,5 +1,15 @@
 # cmp-sign
 
+# v0.0.2
+You must update **gopls** to v0.17.0, because the *document/signature* had a great changed.
+[See more details](https://github.com/golang/tools/blob/master/gopls/doc/release/v0.17.0.md)
+
+Of course, v0.0.1 is also works, which use *document/hover* is not recommand to query a signature.
+
+
+# What is this?
+Nvim completion source for [nvim-cmp](https://github.com/hrsh7th/nvim-cmp).
+
 Get the sign of the function, for example:
 
 input:

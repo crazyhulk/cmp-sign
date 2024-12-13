@@ -10,6 +10,31 @@ local source = {}
 -- value: string, {{sign}} would be replaced with the signature
 local custom_completion_items = {}
 
+-- find the start index of the raw code
+--    s.Name(⁁(*ReviewServer).GetReviewDetailByComicID. -> (*ReviewServer).GetReviewDetailByComicID
+--    ⁁(*ReviewServer).GetReviewDetailByComicID. -> (*ReviewServer).GetReviewDetailByComicID
+--    ⁁GetReviewDetailByComicID. -> GetReviewDetailByComicID
+local function findRawCodeIndex(rawstr)
+	print("rawstr:", rawstr)
+	for i = 1, #rawstr do
+		local j = #rawstr - i
+		if rawstr:sub(j,j):match("%s") then
+			return j + 1
+		end
+		if j == 1 then
+			return j
+		end
+
+		if rawstr:sub(j,j) == "(" and rawstr:sub(j-1,j-1) == "(" then
+			return j
+		end
+		if rawstr:sub(j,j) == "(" and rawstr:sub(j-1,j-1) ~= "." then
+			return j + 1
+		end
+	end
+end
+
+
 source.new = function()
 	local self = setmetatable({}, { __index = source })
 	self.buffers = {}
@@ -46,55 +71,8 @@ source._get = function(_, root, paths)
   return c
 end
 
--- Method to get completion items
--- function source:complete(_, callback)
--- 	local bufnr = vim.api.nvim_get_current_buf()
--- 	local pos = vim.api.nvim_win_get_cursor(0)
--- 	local params = lsp.util.make_position_params()
---
--- 	-- Debugging: print the current cursor position and parameters
--- 	print('Cursor Position:', vim.inspect(pos))
--- 	print('LSP Params:', vim.inspect(params))
--- 	params.position = {
--- 		line = pos[1],
--- 		character = pos[2] - 1,
--- 	}
--- 	print('LSP Params:', vim.inspect(params))
---
--- 	lsp.buf_request(bufnr, 'textDocument/signatureHelp', params, function(err, result, ctx)
--- 		if err then
--- 			print('LSP Error:', err.message)
--- 			callback({})
--- 			return
--- 		end
---
--- 		-- Debugging: print the result of the LSP request
--- 		print('LSP Result:', vim.inspect(result))
---
--- 		if not result or not result.signatures or #result.signatures == 0 then
--- 			print('No signatures found.')
--- 			callback({})
--- 			return
--- 		end
---
--- 		local signature = result.signatures[1].label or "No signature"
---
--- 		callback({
--- 			{
--- 				label = 'Function Signature',
--- 				insertText = signature,
--- 				kind = cmp.lsp.CompletionItemKind.Text,
--- 				documentation = {
--- 					kind = cmp.lsp.MarkupKind.Markdown,
--- 					value = signature,
--- 				},
--- 			},
--- 		})
--- 	end)
--- end
 source.complete = function(self, params, callback)
 	local client = self:_get_client()
-	local trigger_characters = {","}
 	-- for _, c in ipairs(self:_get(client.server_capabilities, { 'signatureHelpProvider', 'triggerCharacters' }) or {}) do
 	-- 	table.insert(trigger_characters, c)
 	-- end
@@ -122,29 +100,41 @@ source.complete = function(self, params, callback)
 	local position = request.position
 	request.position = {
 		line = position.line,
-		character = position.character - 1,
+		character = position.character - 2,
 	}
 
 	request.context = {
 		triggerKind = 2,
 		triggerCharacter = ".",
-		isRetrigger = not not self.signature_help,
+		-- isRetrigger = not not self.signature_help,
 		activeSignatureHelp = self.signature_help,
 	}
 	-- local xparams = vim.lsp.util.make_position_params()
-	-- vim.lsp.buf_request(0, 'textDocument/signatureHelp', xparams, function(err, xsignature_help)
-	-- 	print("========2",err, vim.inspect(xsignature_help))
+	-- position = xparams.position
+	-- xparams.position = {
+	-- 	line = position.line,
+	-- 	character = position.character - 1,
+	-- }
+        --
+	-- vim.lsp.buf_request(0, 'textDocument/signatureHelp', xparams, function(err, result, context, config)
+	-- 	print("========2",err, vim.inspect(result))
 	-- end)
-
-	client.request('textDocument/hover', request, function(err, signature_help, ctx)
+	local line = vim.api.nvim_get_current_line()
+	-- client.request('textDocument/hover', request, function(err, signature_help, ctx)
+	client.request('textDocument/signatureHelp', request, function(err, signature_help, ctx)
 		if err or not signature_help then
 			callback({})
 			return
 		end
 
-		local raw_func_sign = signature_help.contents.value:match("```go\n(func.-)\n```")
+		if #signature_help.signatures < 1 then
+			callback({})
+			return
+		end
 
-		if not signature_help.range or not raw_func_sign then
+
+		local raw_func_sign = "func " .. signature_help.signatures[1].label
+		if not raw_func_sign then
 			callback({})
 			return
 		end
@@ -152,31 +142,22 @@ source.complete = function(self, params, callback)
 		local pattern = "func%s*([%w%s(%.%*)]*)%s+([%w%.]+)(%b())%s*(.*)"
 		local member_object, func_name, param_list, returns = raw_func_sign:match(pattern)
 
-		local isReceiver = not member_object or member_object ~= ""
 
-		local func_sign
-		if isReceiver then
-			if param_list == "()" or not param_list then
-				func_sign = "func " .. member_object:gsub("%)", "") ..  ") " .. returns
-			else
-				func_sign = "func " .. member_object:gsub("%)", "") .. "," .. param_list:gsub("%(", "") .. " " .. returns
-			end
-			-- func_name = signature_help.contents.value:match("%[%`([%w()%.]*)%`")
-		else
-			func_sign = "func " .. param_list .. returns
-		end
+		local func_sign = raw_func_sign:gsub(func_name, "", 1)
 
+		local index = findRawCodeIndex(line:sub(1, position.character))
+		local raw_code = line:sub(index, position.character-1)
 
 		local start_pos = {
-			line = signature_help.range.start.line,
-			character = signature_help.range["end"].character - #func_name
+			line = position.line,
+			character = position.character - #raw_code - 1
 		}
 		local end_pos = {
-			line = signature_help.range["end"].line,
-			character = signature_help.range["end"].character + 4
+			line = position.line,
+			character = position.character
 		}
 
-		local item = {
+		local sign = {
 			label = 'sign',
 			insertText = func_sign,
 			insertTextFormat = 2,  -- Snippet format
@@ -207,7 +188,10 @@ source.complete = function(self, params, callback)
 			},
 		}
 
-		local mockey_text = "mockey.Mock(" .. func_name .. ").To(" .. func_sign .. " {\n\treturn\n}).Build()"
+
+		-- local mockey_text = "mockey.Mock(" .. func_name .. ").To(" .. func_sign .. " {\n\treturn\n}).Build()"
+		-- local mockey_text = "mockey.Mock(" .. line:sub(#line-position.character, #line-1) .. ").To(" .. func_sign .. " {\n\treturn\n}).Build()"
+		local mockey_text = "mockey.Mock(" .. raw_code .. ").To(" .. func_sign .. " {\n\treturn\n}).Build()"
 		local mockey = {
 			label = 'mockey',
 			insertText = mockey_text,
@@ -240,7 +224,7 @@ source.complete = function(self, params, callback)
 		}
 
 		local items = {
-			item,
+			sign,
 			mockey
 		}
 		for i,v in pairs(custom_completion_items) do
