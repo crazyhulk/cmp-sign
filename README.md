@@ -8,7 +8,7 @@ Of course, v0.0.1 is also works, which use *document/hover* is not recommand to 
 
 
 # What is this?
-Nvim completion source for [nvim-cmp](https://github.com/hrsh7th/nvim-cmp).
+Nvim completion source for [nvim-cmp](https://github.com/hrsh7th/nvim-cmp) and [blink.cmp](https://github.com/Saghen/blink.cmp).
 
 Get the sign of the function, for example:
 
@@ -40,8 +40,14 @@ require('cmp_sign').setup({
 ```
 use { 'crazyhulk/cmp-sign' }
 ```
+## Lazy
+```
+{ 'crazyhulk/cmp-sign'}
+```
 
 # Setup
+
+for nvim-cmp users:
 
 ```
 
@@ -50,4 +56,21 @@ require'cmp'.setup {
     { name = 'nvim_cmp_sign' }
   }
 }
+```
+for saghen/blink.cmp users:
+
+Make sure [blink.compat](https://github.com/saghen/blink.compat) is installed.
+```
+sources = {
+	default = { 'nvim_cmp_sign', 'lsp', 'path', 'snippets', 'buffer', 'copilot' },
+	providers = {
+		nvim_cmp_sign = {
+			name = "nvim_cmp_sign",
+			module = 'blink.compat.source',
+			-- score_offset = -3,
+			opts = {},
+		},
+	},
+},
+
 ```
