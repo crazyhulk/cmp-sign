@@ -15,7 +15,6 @@ local custom_completion_items = {}
 --    ⁁(*ReviewServer).GetReviewDetailByComicID. -> (*ReviewServer).GetReviewDetailByComicID
 --    ⁁GetReviewDetailByComicID. -> GetReviewDetailByComicID
 local function findRawCodeIndex(rawstr)
-	print("rawstr:", rawstr)
 	for i = 1, #rawstr do
 		local j = #rawstr - i
 		if rawstr:sub(j,j):match("%s") then
@@ -28,6 +27,11 @@ local function findRawCodeIndex(rawstr)
 		if rawstr:sub(j,j) == "(" and rawstr:sub(j-1,j-1) == "(" then
 			return j
 		end
+
+		if rawstr:sub(j,j) == "(" and rawstr:sub(j-1,j-1):match("%s") then
+			return j
+		end
+
 		if rawstr:sub(j,j) == "(" and rawstr:sub(j-1,j-1) ~= "." then
 			return j + 1
 		end
@@ -189,8 +193,6 @@ source.complete = function(self, params, callback)
 		}
 
 
-		-- local mockey_text = "mockey.Mock(" .. func_name .. ").To(" .. func_sign .. " {\n\treturn\n}).Build()"
-		-- local mockey_text = "mockey.Mock(" .. line:sub(#line-position.character, #line-1) .. ").To(" .. func_sign .. " {\n\treturn\n}).Build()"
 		local mockey_text = "mockey.Mock(" .. raw_code .. ").To(" .. func_sign .. " {\n\treturn\n}).Build()"
 		local mockey = {
 			label = 'mockey',
@@ -225,10 +227,10 @@ source.complete = function(self, params, callback)
 
 		local items = {
 			sign,
-			mockey
+			mockey,
 		}
 		for i,v in pairs(custom_completion_items) do
-			local text = v:gsub("{{name}}", func_name)
+			local text = v:gsub("{{name}}", raw_code)
 			text = text:gsub("{{sign}}", func_sign)
 			local xitem = {
 				label = i,
